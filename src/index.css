@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #0A0E14; /* strand-bg */
+  color: #E8EDF2; /* strand-text */
+  font-family: 'Space Grotesk', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar for a technical feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #121820; 
+}
+::-webkit-scrollbar-thumb {
+  background: #5C6B7A; 
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #E8EDF2; 
+}
