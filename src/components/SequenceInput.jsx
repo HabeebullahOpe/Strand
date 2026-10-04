@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ClipboardPaste, RefreshCw, ClipboardX } from 'lucide-react';
+import { RefreshCw, ClipboardX } from 'lucide-react';
 
 const SAMPLE_SEQUENCE = `ATGCGTACGTAGCTAGCTAGCATCGATCGATCGTAGCTAGCTAGCATCGATCGTAGCTAGCTAGCATCGATCGTAGCTAGCTAGCATCGATCGATCGATCGTAGCTAGCTAGCATCGATCG`;
 
@@ -10,59 +10,50 @@ export default function SequenceInput({ sequence, setSequence }) {
     setSequence(SAMPLE_SEQUENCE);
     setInputValue(SAMPLE_SEQUENCE);
   };
-
   const handleClear = () => {
     setSequence('');
     setInputValue('');
   };
-
   const handleChange = (e) => {
-    const rawValue = e.target.value;
-    setInputValue(rawValue);
-    setSequence(rawValue);
-  };
-
-  const handlePaste = (e) => {
-    // Let the default paste happen, then sync state
-    const pastedText = e.clipboardData.getData('text');
-    const newValue = inputValue + pastedText;
-    setInputValue(newValue);
-    setSequence(newValue);
+    setInputValue(e.target.value);
+    setSequence(e.target.value);
   };
 
   return (
-    <div className="bg-strand-panel rounded-3xl p-6 space-y-4 shadow-lg border border-strand-muted/10">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-strand-text">Sequence Input</h2>
-        <div className="flex gap-2">
-          <button 
+    <div className="h-full bg-strand-panel rounded-2xl p-3 border border-strand-muted/10 flex flex-col">
+      {/* Header */}
+      <div className="shrink-0 flex items-center justify-between mb-2">
+        <h2 className="text-sm font-medium text-strand-text">Sequence Input</h2>
+        <div className="flex gap-1.5">
+          <button
             onClick={handleLoadSample}
-            className="p-2 bg-strand-bg rounded-xl text-strand-a hover:bg-strand-a/10 transition-colors"
-            title="Load Sample"
+            className="p-1.5 bg-strand-bg rounded-lg text-strand-a hover:bg-strand-a/10 transition-colors"
+            title="Load sample"
           >
-            <RefreshCw size={18} />
+            <RefreshCw size={14} />
           </button>
-          <button 
+          <button
             onClick={handleClear}
-            className="p-2 bg-strand-bg rounded-xl text-strand-t hover:bg-strand-t/10 transition-colors"
+            className="p-1.5 bg-strand-bg rounded-lg text-strand-t hover:bg-strand-t/10 transition-colors"
             title="Clear"
           >
-            <ClipboardX size={18} />
+            <ClipboardX size={14} />
           </button>
         </div>
       </div>
-      
+
+      {/* Textarea — fills whatever height remains, but never collapses */}
       <textarea
         value={inputValue}
         onChange={handleChange}
-        onPaste={handlePaste}
-        placeholder="Paste FASTA sequence or raw DNA here..."
-        className="w-full h-32 bg-strand-bg rounded-2xl p-4 text-strand-text font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-strand-a/50 placeholder:text-strand-muted/50 transition-all"
+        placeholder="Paste FASTA or raw DNA..."
+        className="flex-1 min-h-[60px] w-full bg-strand-bg rounded-xl p-3 text-strand-text font-mono text-xs resize-none focus:outline-none focus:ring-1 focus:ring-strand-a/50 placeholder:text-strand-muted/50 transition-all"
       />
-      
-      <div className="flex justify-between items-center text-xs text-strand-muted">
-        <span>Supports A, T, C, G</span>
-        <span>{sequence.length} bases loaded</span>
+
+      {/* Footer */}
+      <div className="shrink-0 flex justify-between items-center text-[10px] text-strand-muted mt-2 font-mono">
+        <span>Supports A T C G N R Y...</span>
+        <span>{sequence.length} bases</span>
       </div>
     </div>
   );
