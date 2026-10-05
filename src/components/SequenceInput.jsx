@@ -1,11 +1,8 @@
-import { useState } from 'react';
 import { RefreshCw, ClipboardX } from 'lucide-react';
 
 const SAMPLE_SEQUENCE = `ATGCGTACGTAGCTAGCTAGCATCGATCGATCGTAGCTAGCTAGCATCGATCGTAGCTAGCTAGCATCGATCGTAGCTAGCTAGCATCGATCGATCGATCGTAGCTAGCTAGCATCGATCG`;
 
-export default function SequenceInput({ sequence, setSequence }) {
-  const [inputValue, setInputValue] = useState('');
-
+export default function SequenceInput({ sequence, setSequence, inputValue, setInputValue }) {
   const handleLoadSample = () => {
     setSequence(SAMPLE_SEQUENCE);
     setInputValue(SAMPLE_SEQUENCE);
@@ -21,7 +18,6 @@ export default function SequenceInput({ sequence, setSequence }) {
 
   return (
     <div className="h-full bg-strand-panel rounded-2xl p-3 border border-strand-muted/10 flex flex-col">
-      {/* Header */}
       <div className="shrink-0 flex items-center justify-between mb-2">
         <h2 className="text-sm font-medium text-strand-text">Sequence Input</h2>
         <div className="flex gap-1.5">
@@ -42,7 +38,6 @@ export default function SequenceInput({ sequence, setSequence }) {
         </div>
       </div>
 
-      {/* Textarea — fills whatever height remains, but never collapses */}
       <textarea
         value={inputValue}
         onChange={handleChange}
@@ -50,7 +45,6 @@ export default function SequenceInput({ sequence, setSequence }) {
         className="flex-1 min-h-[60px] w-full bg-strand-bg rounded-xl p-3 text-strand-text font-mono text-xs resize-none focus:outline-none focus:ring-1 focus:ring-strand-a/50 placeholder:text-strand-muted/50 transition-all"
       />
 
-      {/* Footer */}
       <div className="shrink-0 flex justify-between items-center text-[10px] text-strand-muted mt-2 font-mono">
         <span>Supports A T C G N R Y...</span>
         <span>{sequence.length} bases</span>

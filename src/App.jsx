@@ -13,6 +13,7 @@ const MOBILE_TABS = [
 
 function App() {
   const [sequence, setSequence] = useState('');
+  const [inputValue, setInputValue] = useState('');
   const [activeTab, setActiveTab] = useState('home');
   const [mobileView, setMobileView] = useState('setup');
 
@@ -49,7 +50,12 @@ function App() {
               {/* DESKTOP */}
               <div className="hidden md:grid h-full p-4 gap-4 md:grid-cols-2 md:grid-rows-[1fr_auto]">
                 <div className="shrink-0 md:col-start-1 md:row-start-1 min-h-0">
-                  <SequenceInput sequence={sequence} setSequence={setSequence} />
+                  <SequenceInput
+  sequence={sequence}
+  setSequence={setSequence}
+  inputValue={inputValue}
+  setInputValue={setInputValue}
+/>
                 </div>
                 <div className="shrink-0 md:col-span-2 md:row-start-2 min-h-0">
                   <StatsPanel sequence={sequence} />
@@ -98,7 +104,12 @@ function App() {
                         className="absolute inset-0 p-3 pt-0 flex flex-col gap-3"
                       >
                         <div className="shrink-0 h-[180px]">
-                          <SequenceInput sequence={sequence} setSequence={setSequence} />
+                          <SequenceInput
+  sequence={sequence}
+  setSequence={setSequence}
+  inputValue={inputValue}
+  setInputValue={setInputValue}
+/>
                         </div>
                         <div className="flex-1 min-h-0">
                           <StatsPanel sequence={sequence} />

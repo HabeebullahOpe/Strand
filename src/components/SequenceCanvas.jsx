@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
-import { Search, ChevronUp, ChevronDown, X, Target } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, X, Target, ZoomIn, ZoomOut } from 'lucide-react';
 import { findORFs } from '../utils/sequence';
 
 const BASE_COLORS = {
@@ -11,16 +11,16 @@ const BASE_COLORS = {
 };
 
 const CODING_BASES = new Set(['A', 'T', 'C', 'G']);
-const CELL_SIZE = 14;
-const GAP = 2;
-const ROW_HEIGHT = CELL_SIZE + GAP;
-const ORF_BAR_HEIGHT = 4;
-const BASES_PER_ROW = 60;
 
-const RULER_WIDTH = 48;
-const RULER_PADDING_RIGHT = 8;
-const TICK_HEIGHT_SMALL = 3;
-const TICK_HEIGHT_LARGE = 6;
+// --- Base dimensions at 1.0× zoom ---
+const BASE_CELL = 14;
+const BASE_GAP = 2;
+const ORF_BAR_HEIGHT = 4;
+
+// --- Zoom constraints ---
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 1.8;
+const ZOOM_STEP = 0.1;
 
 const findAllMatches = (sequence, query) => {
   if (!query || sequence.length === 0) return [];
@@ -40,6 +40,7 @@ export default function SequenceCanvas({ sequence }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const [showORFs, setShowORFs] = useState(false);
+  const [zoom, setZoom] = useState(1.0);
 
   const matches = useMemo(() => findAllMatches(sequence, searchQuery), [sequence, searchQuery]);
   const orfs = useMemo(() => findORFs(sequence), [sequence]);
@@ -55,7 +56,33 @@ export default function SequenceCanvas({ sequence }) {
   }, [searchQuery]);
 
   // =====================================================
-  // DRAWING (with ResizeObserver for live resize support)
+  // DERIVED DIMENSIONS (recomputed every render from zoom)
+  // =====================================================
+  const dims = useMemo(() => {
+    const cell = Math.max(6, Math.round(BASE_CELL * zoom));
+    const gap = Math.max(1, Math.round(BASE_GAP * zoom));
+    const rowHeight = cell + gap;
+    const rulerWidth = Math.max(38, Math.round(42 * zoom));
+    const rulerPadding = Math.max(4, Math.round(8 * zoom));
+    const tickSmall = Math.max(2, Math.round(3 * zoom));
+    const tickLarge = Math.max(4, Math.round(6 * zoom));
+    const rulerFontSize = Math.max(8, Math.round(10 * zoom));
+    const orfBarHeight = Math.max(3, Math.round(ORF_BAR_HEIGHT * zoom));
+    return {
+      cell,
+      gap,
+      rowHeight,
+      rulerWidth,
+      rulerPadding,
+      tickSmall,
+      tickLarge,
+      rulerFontSize,
+      orfBarHeight,
+    };
+  }, [zoom]);
+
+  // =====================================================
+  // DRAWING
   // =====================================================
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -71,13 +98,18 @@ export default function SequenceCanvas({ sequence }) {
 
       if (availableWidth <= 0) return;
 
-      const gridWidth = availableWidth - RULER_WIDTH;
-      const colsToDraw = Math.min(
-        BASES_PER_ROW,
-        Math.floor((gridWidth - RULER_PADDING_RIGHT) / (CELL_SIZE + GAP))
+      const {
+        cell, gap, rowHeight, rulerWidth, rulerPadding,
+        tickSmall, tickLarge, rulerFontSize, orfBarHeight,
+      } = dims;
+
+      const gridWidth = availableWidth - rulerWidth;
+      const colsToDraw = Math.max(
+        1,
+        Math.floor((gridWidth - rulerPadding) / (cell + gap))
       );
 
-      const rowHeightWithORF = ROW_HEIGHT + (showORFs ? ORF_BAR_HEIGHT + 2 : 0);
+      const rowHeightWithORF = rowHeight + (showORFs ? orfBarHeight + 2 : 0);
       const rows = Math.ceil(sequence.length / colsToDraw) || 1;
       const totalHeight = Math.max(rows * rowHeightWithORF, 80);
 
@@ -100,43 +132,46 @@ export default function SequenceCanvas({ sequence }) {
         return;
       }
 
-      // Ruler
-      ctx.font = '10px "JetBrains Mono", monospace';
+      // --- Ruler ---
+      ctx.font = `${rulerFontSize}px "JetBrains Mono", monospace`;
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'right';
       for (let row = 0; row < rows; row++) {
         const y = row * rowHeightWithORF;
         const startPos = row * colsToDraw + 1;
         ctx.fillStyle = '#5C6B7A';
-        ctx.fillText(String(startPos), RULER_WIDTH - RULER_PADDING_RIGHT, y + CELL_SIZE / 2);
+        ctx.fillText(String(startPos), rulerWidth - rulerPadding, y + cell / 2);
+
+        // Tick marks
         for (let col = 0; col < colsToDraw; col++) {
           const baseIndex = row * colsToDraw + col;
           if (baseIndex >= sequence.length) break;
-          const tickX = RULER_WIDTH + col * (CELL_SIZE + GAP) + CELL_SIZE / 2;
+          const tickX = rulerWidth + col * (cell + gap) + cell / 2;
           const isMajorTick = (baseIndex + 1) % 10 === 0;
-          const tickHeight = isMajorTick ? TICK_HEIGHT_LARGE : TICK_HEIGHT_SMALL;
+          const tickHeight = isMajorTick ? tickLarge : tickSmall;
           ctx.fillStyle = isMajorTick ? '#5C6B7A' : '#2A3440';
-          ctx.fillRect(tickX, y + CELL_SIZE - tickHeight, 1, tickHeight);
+          ctx.fillRect(tickX, y + cell - tickHeight, 1, tickHeight);
         }
       }
       ctx.fillStyle = '#1A222C';
-      ctx.fillRect(RULER_WIDTH - 1, 0, 1, totalHeight);
+      ctx.fillRect(rulerWidth - 1, 0, 1, totalHeight);
 
-      // Bases
+      // --- Bases ---
+      const cornerRadius = Math.max(1, Math.round(3 * zoom));
       for (let i = 0; i < sequence.length; i++) {
         const base = sequence[i];
         const color = BASE_COLORS[base] || '#2A3440';
         const row = Math.floor(i / colsToDraw);
         const col = i % colsToDraw;
-        const x = RULER_WIDTH + col * (CELL_SIZE + GAP);
+        const x = rulerWidth + col * (cell + gap);
         const y = row * rowHeightWithORF;
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.roundRect(x, y, CELL_SIZE, CELL_SIZE, 3);
+        ctx.roundRect(x, y, cell, cell, cornerRadius);
         ctx.fill();
       }
 
-      // ORF underlines
+      // --- ORF underlines ---
       if (showORFs && orfs.length > 0) {
         orfs.forEach((orf) => {
           let segmentStart = orf.start;
@@ -146,19 +181,19 @@ export default function SequenceCanvas({ sequence }) {
             const segmentEnd = Math.min(orf.end, rowEndBase);
             const colStart = segmentStart % colsToDraw;
             const colEnd = (segmentEnd - 1) % colsToDraw;
-            const xStart = RULER_WIDTH + colStart * (CELL_SIZE + GAP);
-            const xEnd = RULER_WIDTH + colEnd * (CELL_SIZE + GAP) + CELL_SIZE;
-            const y = row * rowHeightWithORF + CELL_SIZE + 2;
+            const xStart = rulerWidth + colStart * (cell + gap);
+            const xEnd = rulerWidth + colEnd * (cell + gap) + cell;
+            const y = row * rowHeightWithORF + cell + 2;
             ctx.fillStyle = 'rgba(0, 229, 160, 0.25)';
-            ctx.fillRect(xStart, y - 1, xEnd - xStart, ORF_BAR_HEIGHT + 2);
+            ctx.fillRect(xStart, y - 1, xEnd - xStart, orfBarHeight + 2);
             ctx.fillStyle = '#00E5A0';
-            ctx.fillRect(xStart, y, xEnd - xStart, ORF_BAR_HEIGHT);
+            ctx.fillRect(xStart, y, xEnd - xStart, orfBarHeight);
             segmentStart = segmentEnd;
           }
         });
       }
 
-      // Search match rings
+      // --- Search match rings ---
       matches.forEach((matchStart, idx) => {
         const isActive = idx === activeMatchIndex;
         for (let offset = 0; offset < searchQuery.length; offset++) {
@@ -166,26 +201,26 @@ export default function SequenceCanvas({ sequence }) {
           if (baseIndex >= sequence.length) break;
           const row = Math.floor(baseIndex / colsToDraw);
           const col = baseIndex % colsToDraw;
-          const x = RULER_WIDTH + col * (CELL_SIZE + GAP);
+          const x = rulerWidth + col * (cell + gap);
           const y = row * rowHeightWithORF;
           ctx.strokeStyle = isActive ? '#E8EDF2' : '#5C6B7A';
           ctx.lineWidth = isActive ? 2 : 1.5;
           ctx.beginPath();
-          ctx.roundRect(x - 1, y - 1, CELL_SIZE + 2, CELL_SIZE + 2, 4);
+          ctx.roundRect(x - 1, y - 1, cell + 2, cell + 2, cornerRadius + 1);
           ctx.stroke();
         }
       });
 
-      // Selected base highlight
+      // --- Selected base highlight ---
       if (selectedIndex !== null && selectedIndex < sequence.length) {
         const row = Math.floor(selectedIndex / colsToDraw);
         const col = selectedIndex % colsToDraw;
-        const x = RULER_WIDTH + col * (CELL_SIZE + GAP);
+        const x = rulerWidth + col * (cell + gap);
         const y = row * rowHeightWithORF;
         ctx.strokeStyle = '#00E5A0';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.roundRect(x - 2, y - 2, CELL_SIZE + 4, CELL_SIZE + 4, 5);
+        ctx.roundRect(x - 2, y - 2, cell + 4, cell + 4, cornerRadius + 2);
         ctx.stroke();
       }
     };
@@ -198,7 +233,7 @@ export default function SequenceCanvas({ sequence }) {
     observer.observe(container);
 
     return () => observer.disconnect();
-  }, [sequence, selectedIndex, matches, activeMatchIndex, searchQuery, showORFs, orfs]);
+  }, [sequence, selectedIndex, matches, activeMatchIndex, searchQuery, showORFs, orfs, dims]);
 
   // =====================================================
   // AUTO-SCROLL TO ACTIVE MATCH
@@ -214,18 +249,16 @@ export default function SequenceCanvas({ sequence }) {
     const paddingLeft = parseFloat(style.paddingLeft);
     const paddingRight = parseFloat(style.paddingRight);
     const availableWidth = container.clientWidth - paddingLeft - paddingRight;
-    const gridWidth = availableWidth - RULER_WIDTH;
-    const colsToDraw = Math.min(
-      BASES_PER_ROW,
-      Math.floor((gridWidth - RULER_PADDING_RIGHT) / (CELL_SIZE + GAP))
-    );
-    const rowHeightWithORF = ROW_HEIGHT + (showORFs ? ORF_BAR_HEIGHT + 2 : 0);
+    const gridWidth = availableWidth - dims.rulerWidth;
+    const colsToDraw = Math.max(1, Math.floor((gridWidth - dims.rulerPadding) / (dims.cell + dims.gap)));
+    const rowHeightWithORF = dims.rowHeight + (showORFs ? dims.orfBarHeight + 2 : 0);
+
     const row = Math.floor(activeMatch / colsToDraw);
     const targetScrollTop = row * rowHeightWithORF;
     const viewportHeight = container.clientHeight;
     const targetScroll = Math.max(0, targetScrollTop - viewportHeight / 2 + rowHeightWithORF);
     container.scrollTo({ top: targetScroll, behavior: 'smooth' });
-  }, [activeMatchIndex, matches, showORFs]);
+  }, [activeMatchIndex, matches, showORFs, dims]);
 
   // =====================================================
   // CLICK HANDLER
@@ -233,24 +266,23 @@ export default function SequenceCanvas({ sequence }) {
   const handleClick = (e) => {
     const canvas = canvasRef.current;
     if (!canvas || sequence.length === 0) return;
+
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
-    if (clickX < RULER_WIDTH) return;
+
+    if (clickX < dims.rulerWidth) return;
 
     const style = window.getComputedStyle(containerRef.current);
     const paddingLeft = parseFloat(style.paddingLeft);
     const paddingRight = parseFloat(style.paddingRight);
     const availableWidth = containerRef.current.clientWidth - paddingLeft - paddingRight;
-    const gridWidth = availableWidth - RULER_WIDTH;
-    const colsToDraw = Math.min(
-      BASES_PER_ROW,
-      Math.floor((gridWidth - RULER_PADDING_RIGHT) / (CELL_SIZE + GAP))
-    );
-    const rowHeightWithORF = ROW_HEIGHT + (showORFs ? ORF_BAR_HEIGHT + 2 : 0);
+    const gridWidth = availableWidth - dims.rulerWidth;
+    const colsToDraw = Math.max(1, Math.floor((gridWidth - dims.rulerPadding) / (dims.cell + dims.gap)));
+    const rowHeightWithORF = dims.rowHeight + (showORFs ? dims.orfBarHeight + 2 : 0);
 
-    const gridX = clickX - RULER_WIDTH;
-    const col = Math.floor(gridX / (CELL_SIZE + GAP));
+    const gridX = clickX - dims.rulerWidth;
+    const col = Math.floor(gridX / (dims.cell + dims.gap));
     const row = Math.floor(clickY / rowHeightWithORF);
 
     if (col < 0 || col >= colsToDraw || row < 0) return;
@@ -266,6 +298,13 @@ export default function SequenceCanvas({ sequence }) {
   const goToNextMatch = () => {
     if (matches.length === 0) return;
     setActiveMatchIndex((prev) => (prev + 1) % matches.length);
+  };
+
+  const changeZoom = (delta) => {
+    setZoom((z) => {
+      const next = Math.round((z + delta) * 10) / 10;
+      return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
+    });
   };
 
   // =====================================================
@@ -286,29 +325,58 @@ export default function SequenceCanvas({ sequence }) {
 
   return (
     <div className="h-full bg-strand-panel rounded-2xl p-3 border border-strand-muted/10 flex flex-col">
-      {/* Header row */}
-      <div className="shrink-0 flex items-center justify-between mb-2">
-        <h2 className="text-sm font-medium text-strand-text">Sequence Viewer</h2>
-        <div className="flex items-center gap-1.5">
+      {/* --- Header row: title · zoom · ORFs --- */}
+      <div className="shrink-0 flex items-center gap-2 mb-2">
+        <h2 className="text-sm font-medium text-strand-text shrink-0">Sequence Viewer</h2>
+
+        {/* Zoom control — fills middle */}
+        <div className="flex-1 min-w-0 flex items-center gap-1.5 bg-strand-bg rounded-lg px-2 py-1">
           <button
-            onClick={() => setShowORFs((v) => !v)}
-            className={`flex items-center gap-1 text-[10px] font-mono px-1.5 py-1 rounded transition-colors ${
-              showORFs
-                ? 'bg-strand-a/20 text-strand-a'
-                : 'bg-strand-bg text-strand-muted hover:text-strand-text'
-            }`}
+            onClick={() => changeZoom(-ZOOM_STEP)}
+            disabled={zoom <= MIN_ZOOM}
+            className="text-strand-muted hover:text-strand-text disabled:opacity-30 transition-colors shrink-0"
+            title="Zoom out"
           >
-            <Target size={10} />
-            ORFs
-            {showORFs && orfs.length > 0 && <span>· {orfs.length}</span>}
+            <ZoomOut size={12} />
           </button>
-          <span className="text-[10px] font-mono text-strand-muted bg-strand-bg px-1.5 py-1 rounded">
-            {BASES_PER_ROW} bp/row
+          <input
+            type="range"
+            min={MIN_ZOOM}
+            max={MAX_ZOOM}
+            step={ZOOM_STEP}
+            value={zoom}
+            onChange={(e) => setZoom(parseFloat(e.target.value))}
+            className="flex-1 min-w-0 h-1 accent-strand-a cursor-pointer"
+          />
+          <button
+            onClick={() => changeZoom(ZOOM_STEP)}
+            disabled={zoom >= MAX_ZOOM}
+            className="text-strand-muted hover:text-strand-text disabled:opacity-30 transition-colors shrink-0"
+            title="Zoom in"
+          >
+            <ZoomIn size={12} />
+          </button>
+          <span className="text-[10px] font-mono text-strand-muted shrink-0 w-8 text-right">
+            {zoom.toFixed(1)}×
           </span>
         </div>
+
+        {/* ORF toggle */}
+        <button
+          onClick={() => setShowORFs((v) => !v)}
+          className={`flex items-center gap-1 text-[10px] font-mono px-1.5 py-1 rounded transition-colors shrink-0 ${
+            showORFs
+              ? 'bg-strand-a/20 text-strand-a'
+              : 'bg-strand-bg text-strand-muted hover:text-strand-text'
+          }`}
+        >
+          <Target size={10} />
+          ORFs
+          {showORFs && orfs.length > 0 && <span>· {orfs.length}</span>}
+        </button>
       </div>
 
-      {/* Search row */}
+      {/* --- Search row --- */}
       <div className="shrink-0 mb-2">
         <div className="flex items-center gap-2 bg-strand-bg rounded-lg px-2.5 py-1.5 border border-strand-muted/10 focus-within:border-strand-a/50 transition-colors">
           <Search size={12} className="text-strand-muted shrink-0" />
@@ -346,7 +414,7 @@ export default function SequenceCanvas({ sequence }) {
         )}
       </div>
 
-      {/* Canvas wrapper — flex-1, scrolls internally */}
+      {/* --- Canvas wrapper --- */}
       <div
         ref={containerRef}
         className="flex-1 min-h-0 w-full rounded-xl bg-strand-bg p-2 overflow-y-auto overflow-x-hidden"
@@ -354,7 +422,7 @@ export default function SequenceCanvas({ sequence }) {
         <canvas ref={canvasRef} onClick={handleClick} className="block cursor-pointer" />
       </div>
 
-      {/* Detail strip */}
+      {/* --- Detail strip --- */}
       <div className="shrink-0 mt-2">
         {selectedIndex === null ? (
           <p className="text-[10px] text-strand-muted font-mono text-center py-1">
