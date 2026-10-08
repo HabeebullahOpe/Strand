@@ -5,42 +5,48 @@ export default function StatsPanel({ sequence }) {
   const composition = getBaseComposition(sequence);
 
   const bases = [
-    { key: 'A', color: 'bg-strand-a', label: 'Adenine' },
-    { key: 'T', color: 'bg-strand-t', label: 'Thymine' },
-    { key: 'C', color: 'bg-strand-c', label: 'Cytosine' },
-    { key: 'G', color: 'bg-strand-g', label: 'Guanine' },
+    { key: 'A', color: 'bg-strand-a' },
+    { key: 'T', color: 'bg-strand-t' },
+    { key: 'C', color: 'bg-strand-c' },
+    { key: 'G', color: 'bg-strand-g' },
   ];
 
   return (
-    <div className="bg-strand-panel rounded-3xl p-6 space-y-6 shadow-lg border border-strand-muted/10">
-      
-      {/* Top Row: Length and GC Content */}
-      <div className="flex justify-between items-end">
+    <div className="bg-strand-panel rounded-2xl px-4 py-3 border border-strand-muted/10 flex items-center gap-6">
+      {/* Left group: Length + GC */}
+      <div className="flex items-center gap-6 shrink-0">
         <div>
-          <p className="text-strand-muted text-sm font-medium mb-1">Sequence Length</p>
-          <p className="text-3xl font-mono font-bold text-strand-text">{sequence.length}</p>
+          <p className="text-[10px] uppercase tracking-wider text-strand-muted leading-none mb-1">
+            Length
+          </p>
+          <p className="text-xl font-mono font-bold text-strand-text leading-none">
+            {sequence.length}
+          </p>
         </div>
-        <div className="text-right">
-          <p className="text-strand-muted text-sm font-medium mb-1">GC Content</p>
-          <p className="text-3xl font-mono font-bold text-strand-a">
-            {gcContent.toFixed(1)}<span className="text-lg">%</span>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-strand-muted leading-none mb-1">
+            GC Content
+          </p>
+          <p className="text-xl font-mono font-bold text-strand-a leading-none">
+            {gcContent.toFixed(1)}<span className="text-sm">%</span>
           </p>
         </div>
       </div>
 
-      {/* Composition Bar */}
-      <div>
-        <p className="text-strand-muted text-sm font-medium mb-2">Base Composition</p>
-        <div className="h-4 w-full bg-strand-bg rounded-full overflow-hidden flex">
+      {/* Divider */}
+      <div className="w-px h-8 bg-strand-muted/15 shrink-0" />
+
+      {/* Composition bar + legend */}
+      <div className="flex-1 min-w-0">
+        <div className="h-1.5 w-full bg-strand-bg rounded-full overflow-hidden flex mb-2">
           {sequence.length > 0 ? (
             bases.map((base) => {
-              const percentage = (composition[base.key] / sequence.length) * 100;
+              const pct = (composition[base.key] / sequence.length) * 100;
               return (
-                <div 
+                <div
                   key={base.key}
-                  className={`${base.color} h-full transition-all duration-500 ease-out`}
-                  style={{ width: `${percentage}%` }}
-                  title={`${base.label}: ${composition[base.key]} (${percentage.toFixed(1)}%)`}
+                  className={`${base.color} h-full transition-all duration-500`}
+                  style={{ width: `${pct}%` }}
                 />
               );
             })
@@ -48,19 +54,16 @@ export default function StatsPanel({ sequence }) {
             <div className="w-full h-full bg-strand-muted/20" />
           )}
         </div>
-        
-        {/* Legend */}
-        <div className="flex justify-between mt-3 text-xs font-mono">
+        <div className="flex justify-between text-[10px] font-mono">
           {bases.map((base) => (
-            <div key={base.key} className="flex items-center gap-1.5">
-              <div className={`w-2 h-2 rounded-full ${base.color}`} />
+            <div key={base.key} className="flex items-center gap-1">
+              <div className={`w-1.5 h-1.5 rounded-full ${base.color}`} />
               <span className="text-strand-text">{base.key}</span>
               <span className="text-strand-muted">({composition[base.key]})</span>
             </div>
           ))}
         </div>
       </div>
-
     </div>
   );
 }

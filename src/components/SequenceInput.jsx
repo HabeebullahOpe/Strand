@@ -1,8 +1,16 @@
 import { RefreshCw, ClipboardX } from 'lucide-react';
+import PresetPicker from './PresetPicker';
 
 const SAMPLE_SEQUENCE = `ATGCGTACGTAGCTAGCTAGCATCGATCGATCGTAGCTAGCTAGCATCGATCGTAGCTAGCTAGCATCGATCGTAGCTAGCTAGCATCGATCGATCGATCGTAGCTAGCTAGCATCGATCG`;
 
-export default function SequenceInput({ sequence, setSequence, inputValue, setInputValue }) {
+export default function SequenceInput({
+  sequence,
+  setSequence,
+  inputValue,
+  setInputValue,
+  onLoadPreset,
+  label = 'Sequence Input',
+}) {
   const handleLoadSample = () => {
     setSequence(SAMPLE_SEQUENCE);
     setInputValue(SAMPLE_SEQUENCE);
@@ -18,9 +26,12 @@ export default function SequenceInput({ sequence, setSequence, inputValue, setIn
 
   return (
     <div className="h-full bg-strand-panel rounded-2xl p-3 border border-strand-muted/10 flex flex-col">
-      <div className="shrink-0 flex items-center justify-between mb-2">
-        <h2 className="text-sm font-medium text-strand-text">Sequence Input</h2>
-        <div className="flex gap-1.5">
+      <div className="shrink-0 flex items-center justify-between gap-2 mb-2">
+        <h2 className="text-sm font-medium text-strand-text shrink-0">{label}</h2>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onLoadPreset && <PresetPicker onSelect={onLoadPreset} />}
+
           <button
             onClick={handleLoadSample}
             className="p-1.5 bg-strand-bg rounded-lg text-strand-a hover:bg-strand-a/10 transition-colors"
