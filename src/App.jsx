@@ -9,7 +9,7 @@ import SequenceCanvas from './components/SequenceCanvas';
 import ProteinView from './components/ProteinView';
 import AlignmentView from './components/AlignmentView';
 import StatsPanel from './components/StatsPanel';
-import PrimerPanel from './components/PrimerPanel';
+import LeftAnalysisPanel from './components/LeftAnalysisPanel';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { reverseComplement } from './utils/sequence';
 
@@ -32,6 +32,7 @@ function App() {
   const [selectedAnnotationId, setSelectedAnnotationId] = useLocalStorage('strand.selectedAnnotationId', null);
 
   const [activeTab, setActiveTab] = useState('home');
+  const [activeDiffIndex, setActiveDiffIndex] = useState(0);
 
   const loadPreset = (preset) => {
     setInputValue(preset.sequence);
@@ -46,6 +47,20 @@ function App() {
     setAnnotations((prev) => [...prev, ann]);
     setSelectedAnnotationId(ann.id);
   };
+
+  const handleRenameAnnotation = (id, newLabel) => {
+    setAnnotations((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, label: newLabel } : a))
+    );
+  };
+
+  const handleDeleteAnnotation = (id) => {
+    setAnnotations((prev) => prev.filter((a) => a.id !== id));
+    if (selectedAnnotationId === id) {
+      setSelectedAnnotationId(null);
+    }
+  };
+
   const handleReverseComplement = () => {
     if (!sequence) return;
     const rc = reverseComplement(sequence);
@@ -55,6 +70,7 @@ function App() {
 
   return (
     <div className="h-[100dvh] w-full flex flex-col bg-strand-bg text-strand-text font-sans overflow-hidden">
+
       {/* HEADER */}
       <header className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-strand-muted/10 relative z-30">
         <div className="flex items-center gap-2">
@@ -63,7 +79,9 @@ function App() {
             DNA<span className="text-strand-a">+</span>
           </span>
         </div>
+
         <div className="flex items-center gap-2">
+          {/* Import */}
           <label className="p-2 rounded-full bg-strand-panel hover:bg-strand-muted/20 transition-colors cursor-pointer">
             <Upload size={18} className="text-strand-muted" />
             <input
@@ -87,6 +105,7 @@ function App() {
             />
           </label>
 
+          {/* Export FASTA */}
           <button
             onClick={() => {
               if (!sequence) return;
@@ -106,6 +125,7 @@ function App() {
             <Download size={18} className="text-strand-muted" />
           </button>
 
+          {/* Reset */}
           <button
             onClick={() => {
               if (!window.confirm('Clear all saved data? This cannot be undone.')) return;
@@ -120,10 +140,38 @@ function App() {
             <RotateCcw size={18} className="text-strand-muted" />
           </button>
 
+          {/* Bell */}
           <button className="p-2 rounded-full bg-strand-panel hover:bg-strand-muted/20 transition-colors">
             <Bell size={18} className="text-strand-muted" />
           </button>
 
+          {/* Desktop nav cluster */}
+          <div className="hidden md:flex items-center gap-1 bg-strand-panel rounded-full p-0.5 border border-strand-muted/10">
+            <button
+              onClick={() => setActiveTab('home')}
+              className={`p-2 rounded-full transition-colors ${
+                activeTab === 'home'
+                  ? 'bg-strand-a/15 text-strand-a'
+                  : 'text-strand-muted hover:text-strand-text'
+              }`}
+              title="Home"
+            >
+              <Dna size={16} />
+            </button>
+            <button
+              onClick={() => setActiveTab('tests')}
+              className={`p-2 rounded-full transition-colors ${
+                activeTab === 'tests'
+                  ? 'bg-strand-a/15 text-strand-a'
+                  : 'text-strand-muted hover:text-strand-text'
+              }`}
+              title="My Tests"
+            >
+              <Menu size={16} />
+            </button>
+          </div>
+
+          {/* Avatar */}
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-strand-a to-strand-c flex items-center justify-center">
             <User size={14} className="text-strand-bg" />
           </div>
@@ -144,16 +192,20 @@ function App() {
             >
               {/* DESKTOP */}
               <div
-                className={`hidden md:grid h-full p-4 gap-4 transition-[grid-template-columns] duration-300 ${collapsed ? 'md:grid-cols-[0px_1fr]' : 'md:grid-cols-2'
-                  }`}
+                className={`hidden md:grid h-full p-4 gap-4 transition-[grid-template-columns] duration-300 ${
+                  collapsed
+                    ? 'md:grid-cols-[0px_1fr] md:grid-rows-[1fr]'
+                    : 'md:grid-cols-2'
+                }`}
               >
-                {/* LEFT COLUMN — Input / Compare / Primer */}
+                {/* LEFT COLUMN — Input / Compare / Analysis */}
                 <div
-                  className={`min-h-0 min-w-0 overflow-hidden transition-opacity duration-200 ${collapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-                    }`}
+                  className={`min-h-0 min-w-0 overflow-hidden transition-opacity duration-200 ${
+                    collapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                  }`}
                 >
                   <div className="h-full flex flex-col gap-3">
-                    <div className="min-h-0 flex-1 overflow-hidden">
+                    <div className="min-h-0 flex-[2] overflow-hidden">
                       <SequenceInput
                         sequence={sequence}
                         setSequence={setSequence}
@@ -162,7 +214,7 @@ function App() {
                         onLoadPreset={loadPreset}
                       />
                     </div>
-                    <div className="min-h-0 flex-1 overflow-hidden">
+                    <div className="min-h-0 flex-[2] overflow-hidden">
                       <SequenceInput
                         sequence={sequenceB}
                         setSequence={setSequenceB}
@@ -172,11 +224,17 @@ function App() {
                         label="Compare With"
                       />
                     </div>
-                    <div className="min-h-0 flex-1 overflow-hidden">
-                      <PrimerPanel
+                    <div className="min-h-0 flex-[4] overflow-hidden">
+                      <LeftAnalysisPanel
                         sequence={sequence}
+                        sequenceB={sequenceB}
                         annotations={annotations}
                         selectedAnnotationId={selectedAnnotationId}
+                        onSelectAnnotation={setSelectedAnnotationId}
+                        onRenameAnnotation={handleRenameAnnotation}
+                        onDeleteAnnotation={handleDeleteAnnotation}
+                        onJumpToDiff={setActiveDiffIndex}
+                        activeDiffIndex={activeDiffIndex}
                       />
                     </div>
                   </div>
@@ -184,8 +242,9 @@ function App() {
 
                 {/* RIGHT COLUMN — Viewer + Stats */}
                 <div
-                  className={`min-h-0 min-w-0 flex flex-col gap-4 transition-all duration-300 ${collapsed ? 'md:col-start-1 md:col-span-2' : ''
-                    }`}
+                  className={`min-h-0 min-w-0 flex flex-col gap-4 transition-all duration-300 ${
+                    collapsed ? 'md:col-start-1 md:col-span-2' : ''
+                  }`}
                 >
                   <div className="flex-1 min-h-0 flex flex-col">
                     <div className="shrink-0 flex justify-end mb-2">
@@ -194,10 +253,11 @@ function App() {
                           <button
                             key={v}
                             onClick={() => setDesktopView(v)}
-                            className={`px-2.5 py-1 text-[10px] font-mono rounded transition-colors capitalize ${desktopView === v
-                              ? 'bg-strand-a text-strand-bg'
-                              : 'text-strand-muted hover:text-strand-text'
-                              }`}
+                            className={`px-2.5 py-1 text-[10px] font-mono rounded transition-colors capitalize ${
+                              desktopView === v
+                                ? 'bg-strand-a text-strand-bg'
+                                : 'text-strand-muted hover:text-strand-text'
+                            }`}
                           >
                             {v}
                           </button>
@@ -219,7 +279,12 @@ function App() {
                       ) : desktopView === 'protein' ? (
                         <ProteinView sequence={sequence} />
                       ) : (
-                        <AlignmentView sequenceA={sequence} sequenceB={sequenceB} />
+                        <AlignmentView
+                          sequenceA={sequence}
+                          sequenceB={sequenceB}
+                          externalActiveDiff={activeDiffIndex}
+                          onActiveDiffChange={setActiveDiffIndex}
+                        />
                       )}
                     </div>
                   </div>
@@ -238,8 +303,9 @@ function App() {
                       <button
                         key={tab.id}
                         onClick={() => setMobileView(tab.id)}
-                        className={`relative px-2.5 py-1 text-[10px] font-medium transition-colors z-10 ${mobileView === tab.id ? 'text-strand-bg' : 'text-strand-muted'
-                          }`}
+                        className={`relative px-2.5 py-1 text-[10px] font-medium transition-colors z-10 ${
+                          mobileView === tab.id ? 'text-strand-bg' : 'text-strand-muted'
+                        }`}
                       >
                         {tab.label}
                       </button>
@@ -251,10 +317,10 @@ function App() {
                           mobileView === 'setup'
                             ? '0%'
                             : mobileView === 'dna'
-                              ? '100%'
-                              : mobileView === 'protein'
-                                ? '200%'
-                                : '300%',
+                            ? '100%'
+                            : mobileView === 'protein'
+                            ? '200%'
+                            : '300%',
                       }}
                       transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                       className="absolute top-0.5 bottom-0.5 left-0.5 w-[calc(25%-2px)] bg-strand-a rounded-full"
@@ -292,11 +358,17 @@ function App() {
                             label="Compare With"
                           />
                         </div>
-                        <div className="shrink-0 h-[200px]">
-                          <PrimerPanel
+                        <div className="shrink-0 h-[280px]">
+                          <LeftAnalysisPanel
                             sequence={sequence}
+                            sequenceB={sequenceB}
                             annotations={annotations}
                             selectedAnnotationId={selectedAnnotationId}
+                            onSelectAnnotation={setSelectedAnnotationId}
+                            onRenameAnnotation={handleRenameAnnotation}
+                            onDeleteAnnotation={handleDeleteAnnotation}
+                            onJumpToDiff={setActiveDiffIndex}
+                            activeDiffIndex={activeDiffIndex}
                           />
                         </div>
                         <div className="flex-1 min-h-0">
@@ -347,7 +419,12 @@ function App() {
                         transition={{ type: 'spring', stiffness: 300, damping: 32 }}
                         className="absolute inset-0 p-3 pt-0"
                       >
-                        <AlignmentView sequenceA={sequence} sequenceB={sequenceB} />
+                        <AlignmentView
+                          sequenceA={sequence}
+                          sequenceB={sequenceB}
+                          externalActiveDiff={activeDiffIndex}
+                          onActiveDiffChange={setActiveDiffIndex}
+                        />
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -374,6 +451,7 @@ function App() {
                 </button>
                 <h2 className="text-lg font-semibold">My Tests</h2>
               </div>
+
               <div className="bg-strand-panel rounded-2xl p-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-strand-muted/20 flex items-center justify-center text-lg">🧬</div>
@@ -402,23 +480,25 @@ function App() {
         </AnimatePresence>
       </main>
 
-      {/* NAV */}
-      <nav className="shrink-0 flex items-center justify-around border-t border-strand-muted/10 bg-strand-panel/40 backdrop-blur-md px-4 py-2 relative z-30">
+      {/* BOTTOM NAV — mobile only */}
+      <nav className="md:hidden shrink-0 flex items-center justify-around border-t border-strand-muted/10 bg-strand-panel/40 backdrop-blur-md px-4 py-2 relative z-30">
         <button
           onClick={() => setActiveTab('home')}
-          className={`flex items-center justify-center p-3 rounded-2xl transition-colors ${activeTab === 'home'
-            ? 'bg-strand-a/15 text-strand-a'
-            : 'text-strand-muted hover:text-strand-text'
-            }`}
+          className={`flex items-center justify-center p-3 rounded-2xl transition-colors ${
+            activeTab === 'home'
+              ? 'bg-strand-a/15 text-strand-a'
+              : 'text-strand-muted hover:text-strand-text'
+          }`}
         >
           <Dna size={22} />
         </button>
         <button
           onClick={() => setActiveTab('tests')}
-          className={`flex items-center justify-center p-3 rounded-2xl transition-colors ${activeTab === 'tests'
-            ? 'bg-strand-a/15 text-strand-a'
-            : 'text-strand-muted hover:text-strand-text'
-            }`}
+          className={`flex items-center justify-center p-3 rounded-2xl transition-colors ${
+            activeTab === 'tests'
+              ? 'bg-strand-a/15 text-strand-a'
+              : 'text-strand-muted hover:text-strand-text'
+          }`}
         >
           <Menu size={22} />
         </button>

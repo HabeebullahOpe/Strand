@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { ChevronUp, ChevronDown, ZoomIn, ZoomOut } from 'lucide-react';
 import { diffSequences } from '../utils/sequence';
+import { computeConsensus, ConsensusIndicator } from './ConsensusRow';
 
 const BASE_COLORS = {
   A: '#00E5A0', T: '#FF5470', C: '#4FA8FF', G: '#FFD23F',
@@ -16,18 +17,22 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 1.8;
 const ZOOM_STEP = 0.1;
 
-export default function AlignmentView({ sequenceA, sequenceB }) {
+export default function AlignmentView({ sequenceA, sequenceB, externalActiveDiff, onActiveDiffChange }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const scrollRef = useRef(null);
 
   const [zoom, setZoom] = useState(1.0);
-  const [activeDiffIndex, setActiveDiffIndex] = useState(0);
+  const [internalActiveDiff, setInternalActiveDiff] = useState(0);
+  const activeDiffIndex = externalActiveDiff ?? internalActiveDiff;
+  const setActiveDiffIndex = onActiveDiffChange ?? setInternalActiveDiff;
 
   const ops = useMemo(() => {
     if (!sequenceA || !sequenceB) return [];
     return diffSequences(sequenceA, sequenceB);
   }, [sequenceA, sequenceB]);
+
+  const { consensus, agreement } = useMemo(() => computeConsensus(ops), [ops]);
 
   const diffIndices = useMemo(() => {
     const out = [];
@@ -72,8 +77,9 @@ export default function AlignmentView({ sequenceA, sequenceB }) {
       setColsToDraw(cols);
 
       const totalRows = Math.ceil(ops.length / cols) || 1;
-      const rowPairHeight = rowHeight * 2 + 4;
-      const contentHeight = totalRows * rowPairHeight;
+      // Each "row" now holds THREE sequence rows: A, B, consensus
+      const rowTripleHeight = rowHeight * 3 + 8;
+      const contentHeight = totalRows * rowTripleHeight;
       const totalHeight = Math.max(contentHeight, container.clientHeight);
 
       const dpr = window.devicePixelRatio || 1;
@@ -107,22 +113,34 @@ export default function AlignmentView({ sequenceA, sequenceB }) {
         const rowStartOp = row * cols;
         const rowEndOp = Math.min(rowStartOp + cols, ops.length);
         const rowOps = ops.slice(rowStartOp, rowEndOp);
-        const rowY = row * rowPairHeight;
+        const rowY = row * rowTripleHeight;
 
+        // Ruler
         ctx.font = `${rulerFontSize}px "JetBrains Mono", monospace`;
         ctx.textBaseline = 'middle';
         ctx.textAlign = 'right';
         ctx.fillStyle = '#5C6B7A';
         ctx.fillText(String(rowStartOp + 1), rulerWidth - rulerPadding, rowY + cell / 2);
 
+        // Divider line under ruler gutter
         ctx.fillStyle = '#1A222C';
-        ctx.fillRect(rulerWidth - 1, rowY, 1, rowPairHeight - 4);
+        ctx.fillRect(rulerWidth - 1, rowY, 1, rowTripleHeight - 8);
+
+        // Three row baselines
+        const yA = rowY;
+        const yB = rowY + rowHeight + 4;
+        const yC = rowY + rowHeight * 2 + 8; // consensus, slightly more gap below B
+
+        // Small "consensus" label in the ruler gutter for the third row
+        ctx.fillStyle = '#5C6B7A';
+        ctx.font = `${Math.max(7, rulerFontSize - 2)}px "JetBrains Mono", monospace`;
+        ctx.fillText('cons', rulerWidth - rulerPadding, yC + cell / 2);
+        ctx.font = `${rulerFontSize}px "JetBrains Mono", monospace`;
 
         rowOps.forEach((op, c) => {
           const x = rulerWidth + c * (cell + gap);
-          const yA = rowY;
-          const yB = rowY + rowHeight + 4;
 
+          // --- Row A ---
           if (op.aChar) {
             ctx.fillStyle = BASE_COLORS[op.aChar] || '#2A3440';
             ctx.beginPath();
@@ -143,6 +161,7 @@ export default function AlignmentView({ sequenceA, sequenceB }) {
             ctx.fill();
           }
 
+          // --- Row B ---
           if (op.bChar) {
             ctx.fillStyle = BASE_COLORS[op.bChar] || '#2A3440';
             ctx.beginPath();
@@ -162,15 +181,45 @@ export default function AlignmentView({ sequenceA, sequenceB }) {
             ctx.roundRect(x, yB, cell, cell, cornerRadius);
             ctx.fill();
           }
+
+          // --- Row C: consensus ---
+          const opIndex = rowStartOp + c;
+          const base = consensus[opIndex];
+
+          if (base === ' ') {
+            // Both gaps — leave empty
+          } else if (base === 'N') {
+            // Disagreement — dim cell with a dot
+            ctx.fillStyle = 'rgba(255, 84, 112, 0.25)';
+            ctx.beginPath();
+            ctx.roundRect(x, yC, cell, cell, cornerRadius);
+            ctx.fill();
+            // Small dot to signal "no consensus"
+            ctx.fillStyle = '#FF5470';
+            ctx.beginPath();
+            ctx.arc(x + cell / 2, yC + cell / 2, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            // Consensus reached — subtle green-tinted cell
+            ctx.fillStyle = 'rgba(0, 229, 160, 0.15)';
+            ctx.beginPath();
+            ctx.roundRect(x, yC, cell, cell, cornerRadius);
+            ctx.fill();
+
+            // Thin green underline to reinforce agreement
+            ctx.fillStyle = '#00E5A0';
+            ctx.fillRect(x + 1, yC + cell - 1, cell - 2, 1);
+          }
         });
       }
 
+      // Active difference highlight spans A and B only (not consensus)
       if (diffIndices.length > 0 && activeDiffIndex < diffIndices.length) {
         const activeOpIndex = diffIndices[activeDiffIndex];
         const row = Math.floor(activeOpIndex / cols);
         const col = activeOpIndex % cols;
         const x = rulerWidth + col * (cell + gap);
-        const yA = row * rowPairHeight;
+        const yA = row * rowTripleHeight;
 
         ctx.strokeStyle = '#E8EDF2';
         ctx.lineWidth = 2;
@@ -189,7 +238,7 @@ export default function AlignmentView({ sequenceA, sequenceB }) {
       cancelAnimationFrame(rafId);
       observer.disconnect();
     };
-  }, [ops, dims, activeDiffIndex, diffIndices, sequenceA, sequenceB]);
+  }, [ops, dims, activeDiffIndex, diffIndices, sequenceA, sequenceB, consensus]);
 
   useEffect(() => {
     if (diffIndices.length === 0) return;
@@ -198,11 +247,11 @@ export default function AlignmentView({ sequenceA, sequenceB }) {
     const scroll = scrollRef.current;
     if (!scroll) return;
 
-    const rowPairHeight = dims.rowHeight * 2 + 4;
+    const rowTripleHeight = dims.rowHeight * 3 + 8;
     const row = Math.floor(activeOpIndex / colsToDraw);
-    const targetScrollTop = row * rowPairHeight;
+    const targetScrollTop = row * rowTripleHeight;
     const viewportHeight = scroll.clientHeight;
-    const targetScroll = Math.max(0, targetScrollTop - viewportHeight / 2 + rowPairHeight);
+    const targetScroll = Math.max(0, targetScrollTop - viewportHeight / 2 + rowTripleHeight);
     scroll.scrollTo({ top: targetScroll, behavior: 'smooth' });
   }, [activeDiffIndex, diffIndices, dims, colsToDraw]);
 
@@ -228,7 +277,7 @@ export default function AlignmentView({ sequenceA, sequenceB }) {
       <div className="shrink-0 flex items-center gap-2 mb-2">
         <h2 className="text-sm font-medium text-strand-text shrink-0">Alignment</h2>
 
-        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+        <div className="flex-1 min-w-0 flex items-center gap-2">
           {ready && diffIndices.length > 0 && (
             <>
               <span className="text-[10px] font-mono text-strand-t shrink-0">
@@ -251,6 +300,7 @@ export default function AlignmentView({ sequenceA, sequenceB }) {
           {ready && diffIndices.length === 0 && (
             <span className="text-[10px] font-mono text-strand-a shrink-0">Identical</span>
           )}
+          {ready && <ConsensusIndicator agreement={agreement} totalPositions={ops.length} />}
         </div>
 
         <div className="flex items-center gap-1.5 bg-strand-bg rounded-lg px-2 py-1 shrink-0">
@@ -291,6 +341,10 @@ export default function AlignmentView({ sequenceA, sequenceB }) {
         <span className="flex items-center gap-1">
           <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(255,84,112,0.15)' }} />
           Gap
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(0,229,160,0.15)', borderBottom: '1px solid #00E5A0' }} />
+          Consensus
         </span>
       </div>
 

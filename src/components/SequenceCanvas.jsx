@@ -412,7 +412,7 @@ export default function SequenceCanvas({
             <PanelLeft size={14} />
           </button>
         )}
-        <h2 className="text-sm font-medium text-strand-text shrink-0">Sequence Viewer</h2>
+        <h2 className="text-sm font-medium text-strand-text shrink-0">Viewer</h2>
 
         <div className="flex-1 min-w-0 flex items-center gap-1.5 bg-strand-bg rounded-lg px-2 py-1">
           <button
