@@ -2,11 +2,13 @@ import { useState, useRef, useEffect } from 'react';
 import AnnotationPanel from './AnnotationPanel';
 import PrimerPanel from './PrimerPanel';
 import VariantReport from './VariantReport';
+import CodonUsage from './CodonUsage';
 
 const TABS = [
   { id: 'annotations', label: 'Annotations' },
   { id: 'primers', label: 'Primers' },
   { id: 'variants', label: 'Variants' },
+  { id: 'codons', label: 'Codons' },
 ];
 
 export default function LeftAnalysisPanel({
@@ -25,7 +27,6 @@ export default function LeftAnalysisPanel({
   const buttonRefs = useRef({});
   const [highlight, setHighlight] = useState({ left: 0, width: 0 });
 
-  // Measure the active tab and position the highlight
   useEffect(() => {
     const btn = buttonRefs.current[tab];
     const container = containerRef.current;
@@ -39,8 +40,10 @@ export default function LeftAnalysisPanel({
   }, [tab]);
 
   return (
-    <div className="h-full bg-strand-panel rounded-2xl p-3 border border-strand-muted/10 flex flex-col">
-      {/* Tab switcher */}
+    <div
+      data-tour="analysis-tabs"
+      className="h-full bg-strand-panel rounded-2xl p-3 border border-strand-muted/10 flex flex-col"
+    >
       <div className="shrink-0 mb-3 flex justify-center">
         <div
           ref={containerRef}
@@ -51,7 +54,7 @@ export default function LeftAnalysisPanel({
               key={t.id}
               ref={(el) => (buttonRefs.current[t.id] = el)}
               onClick={() => setTab(t.id)}
-              className={`relative px-2.5 py-1 text-[10px] font-medium transition-colors z-10 whitespace-nowrap ${
+              className={`relative px-2 py-1 text-[10px] font-medium transition-colors z-10 whitespace-nowrap ${
                 tab === t.id ? 'text-strand-bg' : 'text-strand-muted'
               }`}
             >
@@ -68,7 +71,6 @@ export default function LeftAnalysisPanel({
         </div>
       </div>
 
-      {/* Tab body */}
       <div className="flex-1 min-h-0">
         {tab === 'annotations' && (
           <AnnotationPanel
@@ -94,6 +96,7 @@ export default function LeftAnalysisPanel({
             externalActiveDiff={activeDiffIndex}
           />
         )}
+        {tab === 'codons' && <CodonUsage sequence={sequence} />}
       </div>
     </div>
   );

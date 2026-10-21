@@ -6,6 +6,7 @@ import {
 import { findORFs, nextAnnotationColor } from '../utils/sequence';
 import GCTrack from './GCTrack';
 import ReverseComplementButton from './ReverseComplementButton';
+import ExportImageButton from './ExportImageButton';
 
 const BASE_COLORS = {
   A: '#00E5A0', T: '#FF5470', C: '#4FA8FF', G: '#FFD23F',
@@ -402,7 +403,7 @@ export default function SequenceCanvas({
 
   return (
     <div className="h-full bg-strand-panel rounded-2xl p-3 border border-strand-muted/10 flex flex-col">
-      <div className="shrink-0 flex items-center gap-2 mb-2">
+      <div data-tour="viewer-controls" className="shrink-0 flex items-center gap-2 mb-2">
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
@@ -412,7 +413,7 @@ export default function SequenceCanvas({
             <PanelLeft size={14} />
           </button>
         )}
-        <h2 className="text-sm font-medium text-strand-text shrink-0">Viewer</h2>
+        {/* <h2 className="text-sm font-medium text-strand-text shrink-0">Sequence Viewer</h2> */}
 
         <div className="flex-1 min-w-0 flex items-center gap-1.5 bg-strand-bg rounded-lg px-2 py-1">
           <button
@@ -446,10 +447,11 @@ export default function SequenceCanvas({
         {onAddAnnotation && (
           <button
             onClick={() => setShowAnnotations((v) => !v)}
-            className={`flex items-center gap-1 text-[10px] font-mono px-1.5 py-1 rounded transition-colors shrink-0 ${showAnnotations
-              ? 'bg-strand-a/20 text-strand-a'
-              : 'bg-strand-bg text-strand-muted hover:text-strand-text'
-              }`}
+            className={`flex items-center gap-1 text-[10px] font-mono px-1.5 py-1 rounded transition-colors shrink-0 ${
+              showAnnotations
+                ? 'bg-strand-a/20 text-strand-a'
+                : 'bg-strand-bg text-strand-muted hover:text-strand-text'
+            }`}
             title="Toggle annotations strip"
           >
             <Tag size={10} />
@@ -459,8 +461,9 @@ export default function SequenceCanvas({
 
         <button
           onClick={() => setShowGC((v) => !v)}
-          className={`flex items-center gap-1 text-[10px] font-mono px-1.5 py-1 rounded transition-colors shrink-0 ${showGC ? 'bg-strand-a/20 text-strand-a' : 'bg-strand-bg text-strand-muted hover:text-strand-text'
-            }`}
+          className={`flex items-center gap-1 text-[10px] font-mono px-1.5 py-1 rounded transition-colors shrink-0 ${
+            showGC ? 'bg-strand-a/20 text-strand-a' : 'bg-strand-bg text-strand-muted hover:text-strand-text'
+          }`}
         >
           <Activity size={10} />
           GC
@@ -468,18 +471,14 @@ export default function SequenceCanvas({
 
         <button
           onClick={() => setShowORFs((v) => !v)}
-          className={`flex items-center gap-1 text-[10px] font-mono px-1.5 py-1 rounded transition-colors shrink-0 ${showORFs ? 'bg-strand-a/20 text-strand-a' : 'bg-strand-bg text-strand-muted hover:text-strand-text'
-            }`}
+          className={`flex items-center gap-1 text-[10px] font-mono px-1.5 py-1 rounded transition-colors shrink-0 ${
+            showORFs ? 'bg-strand-a/20 text-strand-a' : 'bg-strand-bg text-strand-muted hover:text-strand-text'
+          }`}
         >
           <Target size={10} />
           ORFs
           {showORFs && orfs.length > 0 && <span>· {orfs.length}</span>}
         </button>
-
-        <ReverseComplementButton
-          onClick={onReverseComplement}
-          disabled={!sequence || sequence.length === 0}
-        />
 
         {showORFs && (
           <div className="shrink-0 flex bg-strand-bg rounded overflow-hidden">
@@ -487,14 +486,25 @@ export default function SequenceCanvas({
               <button
                 key={f}
                 onClick={() => setOrfFrame(f)}
-                className={`px-1.5 py-1 text-[9px] font-mono transition-colors ${orfFrame === f ? 'bg-strand-a/20 text-strand-a' : 'text-strand-muted hover:text-strand-text'
-                  }`}
+                className={`px-1.5 py-1 text-[9px] font-mono transition-colors ${
+                  orfFrame === f ? 'bg-strand-a/20 text-strand-a' : 'text-strand-muted hover:text-strand-text'
+                }`}
               >
                 F{f + 1}
               </button>
             ))}
           </div>
         )}
+
+        <ReverseComplementButton
+          onClick={onReverseComplement}
+          disabled={!sequence || sequence.length === 0}
+        />
+
+        <ExportImageButton
+          canvasRef={canvasRef}
+          filenameBase="strand_dna"
+        />
       </div>
 
       <div className="shrink-0 mb-2">

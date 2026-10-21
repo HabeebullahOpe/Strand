@@ -25,7 +25,10 @@ export default function SequenceInput({
   };
 
   return (
-    <div className="h-full bg-strand-panel rounded-2xl p-3 border border-strand-muted/10 flex flex-col">
+    <div
+      data-tour="input"
+      className="h-full bg-strand-panel rounded-2xl p-3 border border-strand-muted/10 flex flex-col"
+    >
       <div className="shrink-0 flex items-center justify-between gap-2 mb-2">
         <h2 className="text-sm font-medium text-strand-text shrink-0">{label}</h2>
 

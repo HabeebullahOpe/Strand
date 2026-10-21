@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Dna, Menu, Bell, User, ArrowLeft, Upload, Download, RotateCcw,
+  Dna, Menu, Bell, User, ArrowLeft, Upload, Download, RotateCcw, Save, HelpCircle, Wrench,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -10,8 +10,11 @@ import ProteinView from './components/ProteinView';
 import AlignmentView from './components/AlignmentView';
 import StatsPanel from './components/StatsPanel';
 import LeftAnalysisPanel from './components/LeftAnalysisPanel';
-import { useLocalStorage } from './hooks/useLocalStorage';
+import SessionPanel from './components/SessionPanel';
+import OnboardingTour from './components/OnboardingTour';
+import { useNamedSessions } from './hooks/useNamedSessions';
 import { reverseComplement } from './utils/sequence';
+import ToolsHub from './components/ToolsHub';
 
 const MOBILE_TABS = [
   { id: 'setup', label: 'Setup' },
@@ -21,26 +24,56 @@ const MOBILE_TABS = [
 ];
 
 function App() {
-  const [sequence, setSequence] = useLocalStorage('strand.sequence', '');
-  const [inputValue, setInputValue] = useLocalStorage('strand.inputValue', '');
-  const [sequenceB, setSequenceB] = useLocalStorage('strand.sequenceB', '');
-  const [inputValueB, setInputValueB] = useLocalStorage('strand.inputValueB', '');
-  const [mobileView, setMobileView] = useLocalStorage('strand.mobileView', 'setup');
-  const [collapsed, setCollapsed] = useLocalStorage('strand.collapsed', false);
-  const [desktopView, setDesktopView] = useLocalStorage('strand.desktopView', 'dna');
-  const [annotations, setAnnotations] = useLocalStorage('strand.annotations', []);
-  const [selectedAnnotationId, setSelectedAnnotationId] = useLocalStorage('strand.selectedAnnotationId', null);
+  const {
+    sessions,
+    currentSession,
+    currentId,
+    updateCurrentData,
+    createSession,
+    switchSession,
+    renameSession,
+    deleteSession,
+  } = useNamedSessions();
+
+  const sequence = currentSession?.data.sequence ?? '';
+  const inputValue = currentSession?.data.inputValue ?? '';
+  const sequenceB = currentSession?.data.sequenceB ?? '';
+  const inputValueB = currentSession?.data.inputValueB ?? '';
+  const annotations = currentSession?.data.annotations ?? [];
+  const selectedAnnotationId = currentSession?.data.selectedAnnotationId ?? null;
+  const desktopView = currentSession?.data.desktopView ?? 'dna';
+  const mobileView = currentSession?.data.mobileView ?? 'setup';
 
   const [activeTab, setActiveTab] = useState('home');
+  const [collapsed, setCollapsed] = useState(false);
   const [activeDiffIndex, setActiveDiffIndex] = useState(0);
+  const [tourOpen, setTourOpen] = useState(false);
+
+  useEffect(() => {
+    const seen = window.localStorage.getItem('strand.onboardingSeen');
+    if (!seen) {
+      const t = setTimeout(() => setTourOpen(true), 600);
+      return () => clearTimeout(t);
+    }
+  }, []);
+
+  const setSequence = (v) => updateCurrentData({ sequence: v });
+  const setInputValue = (v) => updateCurrentData({ inputValue: v });
+  const setSequenceB = (v) => updateCurrentData({ sequenceB: v });
+  const setInputValueB = (v) => updateCurrentData({ inputValueB: v });
+  const setAnnotations = (vOrFn) => {
+    const next = typeof vOrFn === 'function' ? vOrFn(annotations) : vOrFn;
+    updateCurrentData({ annotations: next });
+  };
+  const setSelectedAnnotationId = (v) => updateCurrentData({ selectedAnnotationId: v });
+  const setDesktopView = (v) => updateCurrentData({ desktopView: v });
+  const setMobileView = (v) => updateCurrentData({ mobileView: v });
 
   const loadPreset = (preset) => {
-    setInputValue(preset.sequence);
-    setSequence(preset.sequence);
+    updateCurrentData({ inputValue: preset.sequence, sequence: preset.sequence });
   };
   const loadPresetB = (preset) => {
-    setInputValueB(preset.sequence);
-    setSequenceB(preset.sequence);
+    updateCurrentData({ inputValueB: preset.sequence, sequenceB: preset.sequence });
   };
 
   const handleAddAnnotation = (ann) => {
@@ -64,24 +97,54 @@ function App() {
   const handleReverseComplement = () => {
     if (!sequence) return;
     const rc = reverseComplement(sequence);
-    setSequence(rc);
-    setInputValue(rc);
+    updateCurrentData({ sequence: rc, inputValue: rc });
+  };
+
+  const handleSaveAs = () => {
+    const name = window.prompt('Save session as:', 'Untitled');
+    if (!name) return;
+    createSession(name, {
+      sequence,
+      inputValue,
+      sequenceB,
+      inputValueB,
+      annotations,
+      selectedAnnotationId,
+      desktopView,
+      mobileView,
+    });
+  };
+
+  const handleCreateSession = (name) => {
+    createSession(name, {});
   };
 
   return (
     <div className="h-[100dvh] w-full flex flex-col bg-strand-bg text-strand-text font-sans overflow-hidden">
 
-      {/* HEADER */}
       <header className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-strand-muted/10 relative z-30">
-        <div className="flex items-center gap-2">
-          <Dna className="text-strand-a w-5 h-5" />
-          <span className="font-bold text-lg tracking-tight">
+        <div className="flex items-center gap-2 min-w-0">
+          <Dna className="text-strand-a w-5 h-5 shrink-0" />
+          <span className="font-bold text-lg tracking-tight shrink-0">
             DNA<span className="text-strand-a">+</span>
           </span>
+          {currentSession && (
+            <span className="hidden md:inline-block text-[10px] font-mono text-strand-muted truncate max-w-[180px] px-2 py-0.5 rounded bg-strand-panel border border-strand-muted/10">
+              {currentSession.name}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Import */}
+          <button
+            onClick={handleSaveAs}
+            disabled={!sequence}
+            className="p-2 rounded-full bg-strand-panel hover:bg-strand-muted/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Save session as..."
+          >
+            <Save size={18} className="text-strand-muted" />
+          </button>
+
           <label className="p-2 rounded-full bg-strand-panel hover:bg-strand-muted/20 transition-colors cursor-pointer">
             <Upload size={18} className="text-strand-muted" />
             <input
@@ -95,8 +158,7 @@ function App() {
                 reader.onload = (event) => {
                   const text = event.target?.result;
                   if (typeof text === 'string') {
-                    setInputValue(text);
-                    setSequence(text);
+                    updateCurrentData({ inputValue: text, sequence: text });
                   }
                 };
                 reader.readAsText(file);
@@ -105,7 +167,6 @@ function App() {
             />
           </label>
 
-          {/* Export FASTA */}
           <button
             onClick={() => {
               if (!sequence) return;
@@ -125,60 +186,62 @@ function App() {
             <Download size={18} className="text-strand-muted" />
           </button>
 
-          {/* Reset */}
           <button
             onClick={() => {
-              if (!window.confirm('Clear all saved data? This cannot be undone.')) return;
+              if (!window.confirm('Clear ALL saved sessions? This cannot be undone.')) return;
               Object.keys(window.localStorage)
                 .filter((k) => k.startsWith('strand.'))
                 .forEach((k) => window.localStorage.removeItem(k));
               window.location.reload();
             }}
             className="p-2 rounded-full bg-strand-panel hover:bg-strand-muted/20 transition-colors"
-            title="Reset session"
+            title="Reset everything"
           >
             <RotateCcw size={18} className="text-strand-muted" />
           </button>
 
-          {/* Bell */}
+          <button
+            onClick={() => setTourOpen(true)}
+            className="p-2 rounded-full bg-strand-panel hover:bg-strand-muted/20 transition-colors"
+            title="Show tour"
+          >
+            <HelpCircle size={18} className="text-strand-muted" />
+          </button>
+
           <button className="p-2 rounded-full bg-strand-panel hover:bg-strand-muted/20 transition-colors">
             <Bell size={18} className="text-strand-muted" />
           </button>
 
-          {/* Desktop nav cluster */}
-          <div className="hidden md:flex items-center gap-1 bg-strand-panel rounded-full p-0.5 border border-strand-muted/10">
+          <div data-tour="nav-desktop" className="hidden md:flex items-center gap-1 bg-strand-panel rounded-full p-0.5 border border-strand-muted/10">
             <button
               onClick={() => setActiveTab('home')}
-              className={`p-2 rounded-full transition-colors ${
-                activeTab === 'home'
-                  ? 'bg-strand-a/15 text-strand-a'
-                  : 'text-strand-muted hover:text-strand-text'
-              }`}
+              className={`p-2 rounded-full transition-colors ${activeTab === 'home' ? 'bg-strand-a/15 text-strand-a' : 'text-strand-muted hover:text-strand-text'}`}
               title="Home"
             >
               <Dna size={16} />
             </button>
             <button
+              onClick={() => setActiveTab('tools')}
+              className={`p-2 rounded-full transition-colors ${activeTab === 'tools' ? 'bg-strand-a/15 text-strand-a' : 'text-strand-muted hover:text-strand-text'}`}
+              title="Advanced Tools"
+            >
+              <Wrench size={16} />
+            </button>
+            <button
               onClick={() => setActiveTab('tests')}
-              className={`p-2 rounded-full transition-colors ${
-                activeTab === 'tests'
-                  ? 'bg-strand-a/15 text-strand-a'
-                  : 'text-strand-muted hover:text-strand-text'
-              }`}
+              className={`p-2 rounded-full transition-colors ${activeTab === 'tests' ? 'bg-strand-a/15 text-strand-a' : 'text-strand-muted hover:text-strand-text'}`}
               title="My Tests"
             >
               <Menu size={16} />
             </button>
           </div>
 
-          {/* Avatar */}
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-strand-a to-strand-c flex items-center justify-center">
             <User size={14} className="text-strand-bg" />
           </div>
         </div>
       </header>
 
-      {/* MAIN */}
       <main className="flex-1 min-h-0 overflow-hidden relative">
         <AnimatePresence mode="wait">
           {activeTab === 'home' && (
@@ -190,19 +253,13 @@ function App() {
               transition={{ duration: 0.15 }}
               className="h-full w-full"
             >
-              {/* DESKTOP */}
               <div
-                className={`hidden md:grid h-full p-4 gap-4 transition-[grid-template-columns] duration-300 ${
-                  collapsed
-                    ? 'md:grid-cols-[0px_1fr] md:grid-rows-[1fr]'
-                    : 'md:grid-cols-2'
-                }`}
-              >
-                {/* LEFT COLUMN — Input / Compare / Analysis */}
-                <div
-                  className={`min-h-0 min-w-0 overflow-hidden transition-opacity duration-200 ${
-                    collapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                className={`hidden md:grid h-full p-4 gap-4 transition-[grid-template-columns] duration-300 ${collapsed ? 'md:grid-cols-[0px_1fr]' : 'md:grid-cols-2'
                   }`}
+              >
+                <div
+                  className={`min-h-0 min-w-0 overflow-hidden transition-opacity duration-200 ${collapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                    }`}
                 >
                   <div className="h-full flex flex-col gap-3">
                     <div className="min-h-0 flex-[2] overflow-hidden">
@@ -240,24 +297,24 @@ function App() {
                   </div>
                 </div>
 
-                {/* RIGHT COLUMN — Viewer + Stats */}
                 <div
-                  className={`min-h-0 min-w-0 flex flex-col gap-4 transition-all duration-300 ${
-                    collapsed ? 'md:col-start-1 md:col-span-2' : ''
-                  }`}
+                  className={`min-h-0 min-w-0 flex flex-col gap-4 transition-all duration-300 ${collapsed ? 'md:col-start-1 md:col-span-2' : ''
+                    }`}
                 >
                   <div className="flex-1 min-h-0 flex flex-col">
                     <div className="shrink-0 flex justify-end mb-2">
-                      <div className="flex bg-strand-panel rounded-lg p-0.5 border border-strand-muted/10">
+                      <div
+                        data-tour="view-toggle"
+                        className="flex bg-strand-panel rounded-lg p-0.5 border border-strand-muted/10"
+                      >
                         {['dna', 'protein', 'align'].map((v) => (
                           <button
                             key={v}
                             onClick={() => setDesktopView(v)}
-                            className={`px-2.5 py-1 text-[10px] font-mono rounded transition-colors capitalize ${
-                              desktopView === v
-                                ? 'bg-strand-a text-strand-bg'
-                                : 'text-strand-muted hover:text-strand-text'
-                            }`}
+                            className={`px-2.5 py-1 text-[10px] font-mono rounded transition-colors capitalize ${desktopView === v
+                              ? 'bg-strand-a text-strand-bg'
+                              : 'text-strand-muted hover:text-strand-text'
+                              }`}
                           >
                             {v}
                           </button>
@@ -295,7 +352,6 @@ function App() {
                 </div>
               </div>
 
-              {/* MOBILE */}
               <div className="md:hidden h-full flex flex-col">
                 <div className="shrink-0 px-3 pt-3 flex justify-center">
                   <div className="relative bg-strand-panel rounded-full p-0.5 flex border border-strand-muted/10">
@@ -303,9 +359,8 @@ function App() {
                       <button
                         key={tab.id}
                         onClick={() => setMobileView(tab.id)}
-                        className={`relative px-2.5 py-1 text-[10px] font-medium transition-colors z-10 ${
-                          mobileView === tab.id ? 'text-strand-bg' : 'text-strand-muted'
-                        }`}
+                        className={`relative px-2.5 py-1 text-[10px] font-medium transition-colors z-10 ${mobileView === tab.id ? 'text-strand-bg' : 'text-strand-muted'
+                          }`}
                       >
                         {tab.label}
                       </button>
@@ -317,10 +372,10 @@ function App() {
                           mobileView === 'setup'
                             ? '0%'
                             : mobileView === 'dna'
-                            ? '100%'
-                            : mobileView === 'protein'
-                            ? '200%'
-                            : '300%',
+                              ? '100%'
+                              : mobileView === 'protein'
+                                ? '200%'
+                                : '300%',
                       }}
                       transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                       className="absolute top-0.5 bottom-0.5 left-0.5 w-[calc(25%-2px)] bg-strand-a rounded-full"
@@ -442,63 +497,59 @@ function App() {
               transition={{ duration: 0.2 }}
               className="h-full flex flex-col p-4 overflow-y-auto"
             >
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-3 mb-4 max-w-2xl mx-auto w-full">
                 <button
                   onClick={() => setActiveTab('home')}
                   className="p-2 bg-strand-panel rounded-full"
                 >
                   <ArrowLeft size={18} />
                 </button>
-                <h2 className="text-lg font-semibold">My Tests</h2>
               </div>
 
-              <div className="bg-strand-panel rounded-2xl p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-strand-muted/20 flex items-center justify-center text-lg">🧬</div>
-                  <div>
-                    <h3 className="text-sm font-medium">Not Tested</h3>
-                    <p className="text-xs text-strand-muted">Awaiting sample</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-strand-muted/20 flex items-center justify-center text-lg">👨‍🔬</div>
-                  <div>
-                    <h3 className="text-sm font-medium">XY Chromosome</h3>
-                    <p className="text-xs text-strand-muted">Male pattern detected</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-strand-muted/20 flex items-center justify-center text-lg">👶</div>
-                  <div>
-                    <h3 className="text-sm font-medium">X Chromosome</h3>
-                    <p className="text-xs text-strand-muted">Female pattern detected</p>
-                  </div>
-                </div>
-              </div>
+              <SessionPanel
+                sessions={sessions}
+                currentId={currentId}
+                onSwitch={(id) => {
+                  switchSession(id);
+                  setActiveTab('home');
+                }}
+                onCreate={handleCreateSession}
+                onRename={renameSession}
+                onDelete={deleteSession}
+              />
+            </motion.div>
+          )}
+          {activeTab === 'tools' && (
+            <motion.div
+              key="tools"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2 }}
+              className="h-full w-full overflow-y-auto"
+            >
+              <ToolsHub sequence={sequence} />
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
-      {/* BOTTOM NAV — mobile only */}
       <nav className="md:hidden shrink-0 flex items-center justify-around border-t border-strand-muted/10 bg-strand-panel/40 backdrop-blur-md px-4 py-2 relative z-30">
         <button
           onClick={() => setActiveTab('home')}
-          className={`flex items-center justify-center p-3 rounded-2xl transition-colors ${
-            activeTab === 'home'
-              ? 'bg-strand-a/15 text-strand-a'
-              : 'text-strand-muted hover:text-strand-text'
-          }`}
+          className={`flex items-center justify-center p-3 rounded-2xl transition-colors ${activeTab === 'home'
+            ? 'bg-strand-a/15 text-strand-a'
+            : 'text-strand-muted hover:text-strand-text'
+            }`}
         >
           <Dna size={22} />
         </button>
         <button
           onClick={() => setActiveTab('tests')}
-          className={`flex items-center justify-center p-3 rounded-2xl transition-colors ${
-            activeTab === 'tests'
-              ? 'bg-strand-a/15 text-strand-a'
-              : 'text-strand-muted hover:text-strand-text'
-          }`}
+          className={`flex items-center justify-center p-3 rounded-2xl transition-colors ${activeTab === 'tests'
+            ? 'bg-strand-a/15 text-strand-a'
+            : 'text-strand-muted hover:text-strand-text'
+            }`}
         >
           <Menu size={22} />
         </button>
@@ -506,6 +557,19 @@ function App() {
           <User size={22} />
         </button>
       </nav>
+
+      {tourOpen && (
+        <OnboardingTour
+          onClose={() => {
+            setTourOpen(false);
+            try {
+              window.localStorage.setItem('strand.onboardingSeen', '1');
+            } catch {
+              /* ignore */
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
